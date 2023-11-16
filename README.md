@@ -10,6 +10,7 @@ dockerが立ち上がるのでdocker上で以下を実行
 cd ~/workspace/salty_servo/servo.sh
 
 参考
+
 https://github.com/NVIDIA/jetson-gpio
 
 https://wisteriahill.sakura.ne.jp/CMS/WordPress/2020/12/07/jetson-nano-gpio-servo-motor/
