@@ -1,0 +1,121 @@
+salty servo インストールの仕方
+
+jetson nanoを用意する
+
+GPIOからpwmを使えるようにする（jetson nanoのハードウェア的に）
+参考https://wisteriahill.sakura.ne.jp/CMS/WordPress/2020/12/07/jetson-nano-gpio-servo-motor/
+
+　sudo /opt/nvidia/jetson-io/jetson-io.py
+
+mkdir ~/workspace
+
+cd ~/workspace
+
+git clone --recursive --depth=1 https://github.com/dusty-nv/jetson-inference
+
+cd jetson-inference
+
+docker/run.sh
+
+　一度、imegeをダウンロードしてdockerを立ち上げる
+
+GPIOからpwmを使えるようにする（jetson nanoのdockerの中でのソフトウェア的に）
+
+参考　https://github.com/NVIDIA/jetson-gpio
+
+sudo pip install Jetson.GPIO
+
+sudo groupadd -f -r gpio
+
+sudo usermod -a -G gpio your_user_name
+
+この状態のdocker imageを保存しておく
+
+docker container ps
+
+docker commit {対象のコンテナID(コンテナ名)} {作成したいイメージ名:タグ名}
+
+具体例
+
+docker commit XXXXXXX dustynv/jetson-inference:latest
+
+タグ名を省略するとlatestに勝手になる
+
+一度dockerを修了させる。ctrl-d
+
+docker/run.shの中身を変更する
+
+この辺り
+
+CONTAINER_IMAGE="dustynv/jetson-inference:latest"
+
+print_var "CONTAINER_IMAGE"
+print_var "ROS_DISTRO"
+print_var "DATA_VOLUME"
+print_var "DEV_VOLUME"
+print_var "USER_VOLUME"
+print_var "USER_COMMAND"
+print_var "V4L2_DEVICES"
+print_var "DISPLAY_DEVICE"
+
+# run the container
+if [ $ARCH = "aarch64" ]; then
+
+	# /proc or /sys files aren't mountable into docker
+	cat /proc/device-tree/model > /tmp/nv_jetson_model
+
+	#	-v /tmp/argus_socket:/tmp/argus_socket \ # for csi camera
+	sudo docker run --runtime nvidia -it --rm \
+		--network host \
+    	-v /etc/enctune.conf:/etc/enctune.conf \
+		-v /etc/nv_tegra_release:/etc/nv_tegra_release \
+		-v /tmp/nv_jetson_model:/tmp/nv_jetson_model \
+        --privileged \
+        -v /proc/device-tree/compatible:/proc/device-tree/compatible \
+        -v /proc/device-tree/chosen:/proc/device-tree/chosen \
+        --device /dev/gpiochip0 \
+        --device /dev/video0 \
+        -v /home/jetson/workspace:/root/workspace \
+		$DISPLAY_DEVICE $V4L2_DEVICES \
+		$DATA_VOLUME $USER_VOLUME $DEV_VOLUME \
+		$CONTAINER_IMAGE $USER_COMMAND
+
+elif [ $ARCH = "x86_64" ]; then
+
+	sudo docker run --gpus all -it --rm \
+		--network=host \
+		--shm-size=8g \
+		--ulimit memlock=-1 \
+		--ulimit stack=67108864 \
+		-e NVIDIA_DRIVER_CAPABILITIES=all \
+		$DISPLAY_DEVICE $V4L2_DEVICES \
+		$DATA_VOLUME $USER_VOLUME $DEV_VOLUME \
+		$CONTAINER_IMAGE $USER_COMMAND
+		
+fi
+
+git clone https://github.com/ba2vwbus13/salty_servo.git
+
+戸惑ったところ
+jetson nano 4Gからjetson nano 2Gに変更した時にimagenet.pyが動かなかった。
+jetson packのバージョン違いによって、jetson nano 2Gでは
+最新のdusty-nv/jetson-inferenceに入っている
+imagenet.py（動かない）とdockerからダウンロードしてくるimegenet.py（動く）の中身が違っていた。
+したがって、dusty-nv/jetson-inferenceに入っている
+imagenet.py（動かない）をdockerからダウンロードしてくるimegenet.py（動く）で置き換えることで対処したが、
+本来は最新のjetson packを使うのが良いと思う。
+
+もう一度dockerを立ち上げる
+
+cd ~/workspace/jetson-inference
+
+docker/run.sh
+
+dockerの中で実行
+
+cd ~/workspace/salty_serbo
+
+./salty.sh
+
+
+
